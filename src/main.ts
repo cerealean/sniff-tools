@@ -11,9 +11,11 @@ interface SniffTools {
         static readonly outerDivHeaderId = this.outerDivId + '_header';
         static readonly statsDivId = this.namespace + 'stats';
         static readonly maxAgeInput = this.namespace + 'max_age_input';
+        static readonly minAgeInput = this.namespace + 'min_age_input';
     }
     interface FilterOptions {
         ageMax?: number;
+        ageMin?: number;
     }
     class Profile {
         age?: number;
@@ -110,6 +112,11 @@ interface SniffTools {
             profilesToHide.push(...profilesAboveAgeMax);
             profiles = profiles.filter(p => !profilesAboveAgeMax.includes(p));
         }
+        if (filterOptions.ageMin) {
+            const profilesUnderMinAge = profiles.filter(p => p.age === undefined || p.age < filterOptions.ageMin!);
+            profilesToHide.push(...profilesUnderMinAge);
+            profiles = profiles.filter(p => !profilesUnderMinAge.includes(p));
+        }
         currentValues.profilesShown = profiles.length;
         currentValues.profilesHidden = profilesToHide.length;
         showElements(...profiles.map(p => p.element!));
@@ -123,7 +130,8 @@ interface SniffTools {
     }
     function filterButtonClicked() {
         filterUnwantedProfiles({
-            ageMax: currentValues.maxAge
+            ageMax: currentValues.maxAge,
+            ageMin: currentValues.minAge
         });
         updateStats();
     }
@@ -151,10 +159,8 @@ interface SniffTools {
             outerDiv.style.border = '1px solid black';
             outerDiv.style.position = 'absolute';
             outerDiv.style.zIndex = '99';
-            outerDiv.style.minWidth = '150px';
-            outerDiv.style.minHeight = '125px';
-            outerDiv.style.width = '18vw';
-            outerDiv.style.height = '16vh';
+            outerDiv.style.minWidth = '18vw';
+            outerDiv.style.minHeight = '16vh';
             outerDiv.style.resize = 'both';
 
             return outerDiv;
@@ -178,9 +184,13 @@ interface SniffTools {
             filterWrapper.style.height = '100%';
             filterWrapper.style.padding = '3px';
             const { maxAgeLabel, maxAgeInput } = setupMaxAgeFilterElements();
+            const { minAgeLabel, minAgeInput } = setupMinAgeFilterElements();
             const filterButton = setupFilterButton();
             filterWrapper.appendChild(maxAgeLabel);
             filterWrapper.appendChild(maxAgeInput);
+            filterWrapper.appendChild(createBreakElement());
+            filterWrapper.appendChild(minAgeLabel);
+            filterWrapper.appendChild(minAgeInput);
             filterWrapper.appendChild(createBreakElement());
             filterWrapper.appendChild(filterButton);
             filterWrapper.appendChild(createBreakElement());
@@ -189,7 +199,6 @@ interface SniffTools {
 
             function setupFilterButton() {
                 const filterButton = document.createElement('button');
-                // filterButton.style.border = '1px solid black';
                 filterButton.style.borderRadius = '2px';
                 filterButton.style.backgroundColor = 'grey';
                 filterButton.style.transitionDuration = '0.4s';
@@ -226,6 +235,23 @@ interface SniffTools {
                 maxAgeLabel.innerHTML = '<h3>Max Age</h3>';
                 return { maxAgeLabel, maxAgeInput };
             }
+            function setupMinAgeFilterElements() {
+                const minAgeInput = document.createElement('input');
+                minAgeInput.type = 'number';
+                minAgeInput.max = '120';
+                minAgeInput.min = '18';
+                minAgeInput.required = false;
+                minAgeInput.id = Constants.minAgeInput;
+                minAgeInput.title = 'The minimum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.';
+                minAgeInput.placeholder = 'Min Age e.g. 20';
+                minAgeInput.style.border = '1px solid black';
+                minAgeInput.style.margin = '1px 3px 2px 3px';
+                minAgeInput.oninput = () => currentValues.minAge = minAgeInput.valueAsNumber;
+                const minAgeLabel = document.createElement('label');
+                minAgeLabel.htmlFor = minAgeInput.id;
+                minAgeLabel.innerHTML = '<h3>Min Age</h3>';
+                return { minAgeLabel, minAgeInput };
+            }
         }
         function createBreakElement(): HTMLBRElement {
             return document.createElement('br');
@@ -246,7 +272,4 @@ interface SniffTools {
     window.sniffTools = {
         initialized: true
     };
-
-    // const maxAge = +prompt('What is the max age?');
-    // filterUnwantedProfiles({ ageMax: maxAge });
 })(document.body as HTMLBodyElement);

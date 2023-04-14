@@ -5,9 +5,13 @@ interface SniffTools {
     initialized: boolean;
 }
 ((bodyElement: HTMLBodyElement) => {
-    const constants = {
-        namespace: 'sniff_extra_tooling_'
-    };
+    class Constants {
+        static readonly namespace = 'sniff_extra_tooling_';
+        static readonly outerDivId = this.namespace + 'outer_div';
+        static readonly outerDivHeaderId = this.outerDivId + '_header';
+        static readonly statsDivId = this.namespace + 'stats';
+        static readonly maxAgeInput = this.namespace + 'max_age_input';
+    }
     interface FilterOptions {
         ageMax?: number;
     }
@@ -15,6 +19,13 @@ interface SniffTools {
         age?: number;
         element?: HTMLDivElement;
     }
+    interface CurrentValues {
+        profilesHidden?: number;
+        profilesShown?: number;
+        maxAge?: number;
+        minAge?: number;
+    };
+    const currentValues: CurrentValues = {};
     function isNumber(val: any) {
         return !isNaN(val);
     }
@@ -33,15 +44,13 @@ interface SniffTools {
         });
     }
     function makeElementDraggable(elmnt: HTMLElement) {
-        var pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        const headerElement = document.getElementById(elmnt.id + "header");
-        if (headerElement) {
-            // if present, the header is where you move the DIV from:
-            headerElement.onmousedown = dragMouseDown;
-        } else {
-            // otherwise, move the DIV from anywhere inside the DIV:
-            elmnt.onmousedown = dragMouseDown;
+        let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+        const headerElement = document.getElementById(Constants.outerDivHeaderId);
+        if (!headerElement) {
+            return;
         }
+
+        headerElement.onmousedown = dragMouseDown;
 
         function dragMouseDown(e: MouseEvent) {
             e = e || window.event;
@@ -49,9 +58,9 @@ interface SniffTools {
             // get the mouse cursor position at startup:
             pos3 = e.clientX;
             pos4 = e.clientY;
-            document.onmouseup = closeDragElement;
+            headerElement!.onmouseup = closeDragElement;
             // call a function whenever the cursor moves:
-            document.onmousemove = elementDrag;
+            headerElement!.onmousemove = elementDrag;
         }
 
         function elementDrag(e: MouseEvent) {
@@ -69,8 +78,8 @@ interface SniffTools {
 
         function closeDragElement() {
             // stop moving when mouse button is released:
-            document.onmouseup = null;
-            document.onmousemove = null;
+            headerElement!.onmouseup = null;
+            headerElement!.onmousemove = null;
         }
     }
     function tryGetAgeFromTitleString(titleString?: string) {
@@ -101,48 +110,130 @@ interface SniffTools {
             profilesToHide.push(...profilesAboveAgeMax);
             profiles = profiles.filter(p => !profilesAboveAgeMax.includes(p));
         }
-        console.log('result', profiles, profilesToHide);
+        currentValues.profilesShown = profiles.length;
+        currentValues.profilesHidden = profilesToHide.length;
         showElements(...profiles.map(p => p.element!));
         hideElements(...profilesToHide.map(p => p.element!));
     }
-
+    function updateStats() {
+        const statsDiv = bodyElement.querySelector(`#${Constants.statsDivId}`) as HTMLDivElement | undefined;
+        if(statsDiv) {
+            statsDiv.innerHTML = `<strong>Profiles Shown</strong>:&nbsp;${currentValues.profilesShown},&nbsp;<strong>Profiles Hidden</strong>:&nbsp;${currentValues.profilesHidden}`;
+        }
+    }
+    function filterButtonClicked() {
+        filterUnwantedProfiles({
+            ageMax: currentValues.maxAge
+        });
+        updateStats();
+    }
     function setupUI() {
         const outerDiv = setupOuterDiv();
+
         addOuterDivHeader(outerDiv);
+        addStatsDiv(outerDiv);
+        addFilterOptions(outerDiv);
+
         bodyElement.appendChild(outerDiv);
+        makeElementDraggable(outerDiv);
+
+        function addStatsDiv(outerDivElmt: HTMLDivElement) {
+            const statsDiv = document.createElement('div');
+            statsDiv.id = Constants.statsDivId;
+            statsDiv.title = 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.';
+            outerDivElmt.appendChild(statsDiv);
+        }
 
         function setupOuterDiv() {
             const outerDiv = document.createElement('div');
-            outerDiv.id = constants.namespace + 'outer_div';
+            outerDiv.id = Constants.outerDivId;
             outerDiv.style.backgroundColor = 'white';
             outerDiv.style.border = '1px solid black';
             outerDiv.style.position = 'absolute';
             outerDiv.style.zIndex = '99';
             outerDiv.style.minWidth = '150px';
             outerDiv.style.minHeight = '125px';
+            outerDiv.style.width = '18vw';
+            outerDiv.style.height = '16vh';
+            outerDiv.style.resize = 'both';
 
             return outerDiv;
         }
         function addOuterDivHeader(outerDivElmt: HTMLDivElement) {
             const headerElement = document.createElement('div');
-            headerElement.id = outerDiv.id + 'header';
+            headerElement.id = Constants.outerDivHeaderId;
             headerElement.style.textAlign = 'center';
-            headerElement.style.fontWeight = 'bold';
+            headerElement.style.fontWeight = 'bolder';
             headerElement.style.borderBottom = '1px solid black';
-            headerElement.innerText = 'Sniff Tools';
-            headerElement.style.cursor = 'grab';
-            headerElement.onfocus = () => {
-                headerElement.style.cursor = 'grabbing';
-            };
+            headerElement.innerHTML = '<h2>Sniff Tools</h2>';
+            headerElement.style.cursor = 'move';
             headerElement.onblur = () => {
                 headerElement.style.cursor = 'initial';
             };
             outerDivElmt.appendChild(headerElement);
         }
+        function addFilterOptions(outerDivElmt: HTMLDivElement) {
+            const filterWrapper = document.createElement('div');
+            filterWrapper.style.width = '100%';
+            filterWrapper.style.height = '100%';
+            filterWrapper.style.padding = '3px';
+            const { maxAgeLabel, maxAgeInput } = setupMaxAgeFilterElements();
+            const filterButton = setupFilterButton();
+            filterWrapper.appendChild(maxAgeLabel);
+            filterWrapper.appendChild(maxAgeInput);
+            filterWrapper.appendChild(createBreakElement());
+            filterWrapper.appendChild(filterButton);
+            filterWrapper.appendChild(createBreakElement());
+
+            outerDivElmt.appendChild(filterWrapper);
+
+            function setupFilterButton() {
+                const filterButton = document.createElement('button');
+                // filterButton.style.border = '1px solid black';
+                filterButton.style.borderRadius = '2px';
+                filterButton.style.backgroundColor = 'grey';
+                filterButton.style.transitionDuration = '0.4s';
+                filterButton.onmouseover = () => {
+                    filterButton.style.backgroundColor = 'white';
+                    filterButton.style.border = '2px solid black';
+                };
+                filterButton.onmouseleave = () => {
+                    filterButton.style.backgroundColor = 'grey';
+                    filterButton.style.border = 'none';
+                };
+                filterButton.innerText = 'Filter Profiles';
+                filterButton.onclick = (ev) => {
+                    ev.preventDefault();
+                    filterButtonClicked();
+                };
+                return filterButton;
+            }
+
+            function setupMaxAgeFilterElements() {
+                const maxAgeInput = document.createElement('input');
+                maxAgeInput.type = 'number';
+                maxAgeInput.max = '120';
+                maxAgeInput.min = '18';
+                maxAgeInput.required = false;
+                maxAgeInput.id = Constants.maxAgeInput;
+                maxAgeInput.title = 'The maximum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.';
+                maxAgeInput.placeholder = 'Max Age e.g. 55';
+                maxAgeInput.style.border = '1px solid black';
+                maxAgeInput.style.margin = '1px 3px 2px 3px';
+                maxAgeInput.oninput = () => currentValues.maxAge = maxAgeInput.valueAsNumber;
+                const maxAgeLabel = document.createElement('label');
+                maxAgeLabel.htmlFor = maxAgeInput.id;
+                maxAgeLabel.innerHTML = '<h3>Max Age</h3>';
+                return { maxAgeLabel, maxAgeInput };
+            }
+        }
+        function createBreakElement(): HTMLBRElement {
+            return document.createElement('br');
+        }
     }
 
     function clearUI() {
-        const outerDiv: HTMLDivElement = (bodyElement as any).getElementById(constants.namespace + 'outer_div');
+        const outerDiv = bodyElement.querySelector(`#${Constants.outerDivId}`);
         if (outerDiv) {
             outerDiv.remove();
         }

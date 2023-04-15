@@ -1,10 +1,29 @@
 interface Window {
-    sniffTools: SniffTools
+    sniffTools: {
+        initialized: boolean
+    }
 }
-interface SniffTools {
-    initialized: boolean;
-}
-((bodyElement: HTMLBodyElement) => {
+((bodyElement: HTMLBodyElement, docCreateElement) => {
+    interface FilterOptions {
+        ageMax?: number;
+        ageMin?: number;
+    }
+    interface CurrentValues {
+        profilesHidden?: number;
+        profilesShown?: number;
+        maxAge?: number;
+        minAge?: number;
+    };
+    type DeepPartial<T> = T extends object ? {
+        [P in keyof T]?: DeepPartial<T[P]>;
+    } : T;
+    type ElementCreationGeneralNonFunctionProperties<T extends keyof HTMLElementTagNameMap> = Pick<DeepPartial<HTMLElementTagNameMap[T]>, 'id' | 'title' | 'style' | 'innerHTML' | 'innerText'>;
+    type ElementCreationGeneralFunctionProperties<T extends keyof HTMLElementTagNameMap> = Partial<Pick<HTMLElementTagNameMap[T], 'onblur' | 'onmouseover' | 'onmouseleave' | 'onclick'>>;
+    type ElementCreationGeneralProperties<T extends keyof HTMLElementTagNameMap> = ElementCreationGeneralNonFunctionProperties<T> & ElementCreationGeneralFunctionProperties<T>;
+    type ElementCreationInputProperties = Partial<Pick<HTMLInputElement, 'type' | 'min' | 'max' | 'required' | 'placeholder'>>;
+    type ElementCreationOptions<T extends keyof HTMLElementTagNameMap> = T extends HTMLInputElement
+        ? (ElementCreationInputProperties & ElementCreationGeneralProperties<T>)
+        : ElementCreationGeneralProperties<T>;
     class Constants {
         static readonly namespace = 'sniff_extra_tooling_';
         static readonly outerDivId = this.namespace + 'outer_div';
@@ -13,23 +32,31 @@ interface SniffTools {
         static readonly maxAgeInput = this.namespace + 'max_age_input';
         static readonly minAgeInput = this.namespace + 'min_age_input';
     }
-    interface FilterOptions {
-        ageMax?: number;
-        ageMin?: number;
-    }
     class Profile {
         age?: number;
         element?: HTMLDivElement;
     }
-    interface CurrentValues {
-        profilesHidden?: number;
-        profilesShown?: number;
-        maxAge?: number;
-        minAge?: number;
-    };
     const currentValues: CurrentValues = {};
     function isNumber(val: any) {
         return !isNaN(val);
+    }
+    function styleElement(elmt: HTMLElement, styleOptions: DeepPartial<CSSStyleDeclaration>) {
+        const style = elmt.style;
+        for (const [key, value] of Object.entries(styleOptions)) {
+            style.setProperty(key, value as string | null);
+        }
+    }
+    function createElement<T extends keyof HTMLElementTagNameMap>(tag: T, options?: ElementCreationOptions<T>): HTMLElementTagNameMap[T] {
+        const newElement = docCreateElement(tag);
+        if (options) {
+            if (options.id) newElement.id = options.id;
+            if (options.title) newElement.title = options.title;
+            if (options.innerHTML) newElement.innerHTML = options.innerHTML;
+            if (options.innerText) newElement.innerText = options.innerText;
+            if (options.onblur) newElement.onblur = options.onblur;
+            if (options.style) styleElement(newElement, options.style);
+        }
+        return newElement;
     }
     function hideElements(...elements: HTMLElement[]) {
         elements.forEach(el => {
@@ -44,6 +71,9 @@ interface SniffTools {
                 el.style.display = 'initial';
             }
         });
+    }
+    function appendChildren(parent: HTMLElement, ...children: HTMLElement[]) {
+        children.forEach(elmt => parent.appendChild(elmt));
     }
     function makeElementDraggable(elmnt: HTMLElement) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
@@ -124,7 +154,7 @@ interface SniffTools {
     }
     function updateStats() {
         const statsDiv = bodyElement.querySelector(`#${Constants.statsDivId}`) as HTMLDivElement | undefined;
-        if(statsDiv) {
+        if (statsDiv) {
             statsDiv.innerHTML = `<strong>Profiles Shown</strong>:&nbsp;${currentValues.profilesShown},&nbsp;<strong>Profiles Hidden</strong>:&nbsp;${currentValues.profilesHidden}`;
         }
     }
@@ -146,80 +176,74 @@ interface SniffTools {
         makeElementDraggable(outerDiv);
 
         function addStatsDiv(outerDivElmt: HTMLDivElement) {
-            const statsDiv = document.createElement('div');
-            statsDiv.id = Constants.statsDivId;
-            statsDiv.title = 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.';
+            const statsDiv = createElement('div', { id: Constants.statsDivId, title: 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.' });
             outerDivElmt.appendChild(statsDiv);
         }
-
         function setupOuterDiv() {
-            const outerDiv = document.createElement('div');
-            outerDiv.id = Constants.outerDivId;
-            outerDiv.style.backgroundColor = 'white';
-            outerDiv.style.border = '1px solid black';
-            outerDiv.style.position = 'absolute';
-            outerDiv.style.zIndex = '99';
-            outerDiv.style.minWidth = '18vw';
-            outerDiv.style.minHeight = '16vh';
-            outerDiv.style.resize = 'both';
+            const outerDiv = createElement('div', {
+                id: Constants.outerDivId,
+                style: {
+                    backgroundColor: 'white',
+                    border: '1px solid black',
+                    position: 'absolute',
+                    zIndex: '99',
+                    minWidth: '18vw',
+                    minHeight: '16vh',
+                    resize: 'both'
+                }
+            });
 
             return outerDiv;
         }
         function addOuterDivHeader(outerDivElmt: HTMLDivElement) {
-            const headerElement = document.createElement('div');
-            headerElement.id = Constants.outerDivHeaderId;
-            headerElement.style.textAlign = 'center';
-            headerElement.style.fontWeight = 'bolder';
-            headerElement.style.borderBottom = '1px solid black';
-            headerElement.innerHTML = '<h2>Sniff Tools</h2>';
-            headerElement.style.cursor = 'move';
-            headerElement.onblur = () => {
-                headerElement.style.cursor = 'initial';
-            };
+            const headerElement = createElement('div', {
+                id: Constants.outerDivHeaderId,
+                innerHTML: '<h2>Sniff Tools</h2>',
+                style: {
+                    textAlign: 'center',
+                    fontWeight: 'bolder',
+                    borderBottom: '1px solid black',
+                    cursor: 'move'
+                },
+                onblur: () => {
+                    headerElement.style.cursor = 'initial';
+                }
+            });
             outerDivElmt.appendChild(headerElement);
         }
         function addFilterOptions(outerDivElmt: HTMLDivElement) {
-            const filterWrapper = document.createElement('div');
-            filterWrapper.style.width = '100%';
-            filterWrapper.style.height = '100%';
-            filterWrapper.style.padding = '3px';
+            const filterWrapper = createElement('div');
+            styleElement(filterWrapper, { width: '100%', height: '100%', padding: '3px' });
             const { maxAgeLabel, maxAgeInput } = setupMaxAgeFilterElements();
             const { minAgeLabel, minAgeInput } = setupMinAgeFilterElements();
             const filterButton = setupFilterButton();
-            filterWrapper.appendChild(maxAgeLabel);
-            filterWrapper.appendChild(maxAgeInput);
-            filterWrapper.appendChild(createBreakElement());
-            filterWrapper.appendChild(minAgeLabel);
-            filterWrapper.appendChild(minAgeInput);
-            filterWrapper.appendChild(createBreakElement());
-            filterWrapper.appendChild(filterButton);
-            filterWrapper.appendChild(createBreakElement());
-
+            appendChildren(filterWrapper, maxAgeLabel, maxAgeInput, createBreakElement(), minAgeLabel, minAgeInput, createBreakElement(), filterButton, createBreakElement());
             outerDivElmt.appendChild(filterWrapper);
 
             function setupFilterButton() {
-                const filterButton = document.createElement('button');
-                filterButton.style.borderRadius = '2px';
-                filterButton.style.backgroundColor = 'grey';
-                filterButton.style.transitionDuration = '0.4s';
-                filterButton.onmouseover = () => {
-                    filterButton.style.backgroundColor = 'white';
-                    filterButton.style.border = '2px solid black';
-                };
-                filterButton.onmouseleave = () => {
-                    filterButton.style.backgroundColor = 'grey';
-                    filterButton.style.border = 'none';
-                };
-                filterButton.innerText = 'Filter Profiles';
-                filterButton.onclick = (ev) => {
-                    ev.preventDefault();
-                    filterButtonClicked();
-                };
-                return filterButton;
+                return createElement('button', {
+                    innerText: 'Filter Profiles',
+                    style: {
+                        borderRadius: '2px',
+                        backgroundColor: 'grey',
+                        transitionDuration: '0.4s'
+                    },
+                    onmouseover: () => {
+                        filterButton.style.backgroundColor = 'white';
+                        filterButton.style.border = '2px solid black';
+                    },
+                    onmouseleave: () => {
+                        filterButton.style.backgroundColor = 'grey';
+                        filterButton.style.border = 'none';
+                    },
+                    onclick: (ev) => {
+                        ev.preventDefault();
+                        filterButtonClicked();
+                    }
+                });
             }
-
             function setupMaxAgeFilterElements() {
-                const maxAgeInput = document.createElement('input');
+                const maxAgeInput = createElement('input');
                 maxAgeInput.type = 'number';
                 maxAgeInput.max = '120';
                 maxAgeInput.min = '18';
@@ -230,13 +254,13 @@ interface SniffTools {
                 maxAgeInput.style.border = '1px solid black';
                 maxAgeInput.style.margin = '1px 3px 2px 3px';
                 maxAgeInput.oninput = () => currentValues.maxAge = maxAgeInput.valueAsNumber;
-                const maxAgeLabel = document.createElement('label');
+                const maxAgeLabel = createElement('label');
                 maxAgeLabel.htmlFor = maxAgeInput.id;
                 maxAgeLabel.innerHTML = '<h3>Max Age</h3>';
                 return { maxAgeLabel, maxAgeInput };
             }
             function setupMinAgeFilterElements() {
-                const minAgeInput = document.createElement('input');
+                const minAgeInput = createElement('input');
                 minAgeInput.type = 'number';
                 minAgeInput.max = '120';
                 minAgeInput.min = '18';
@@ -247,24 +271,22 @@ interface SniffTools {
                 minAgeInput.style.border = '1px solid black';
                 minAgeInput.style.margin = '1px 3px 2px 3px';
                 minAgeInput.oninput = () => currentValues.minAge = minAgeInput.valueAsNumber;
-                const minAgeLabel = document.createElement('label');
+                const minAgeLabel = createElement('label');
                 minAgeLabel.htmlFor = minAgeInput.id;
                 minAgeLabel.innerHTML = '<h3>Min Age</h3>';
                 return { minAgeLabel, minAgeInput };
             }
         }
         function createBreakElement(): HTMLBRElement {
-            return document.createElement('br');
+            return createElement('br');
         }
     }
-
     function clearUI() {
         const outerDiv = bodyElement.querySelector(`#${Constants.outerDivId}`);
         if (outerDiv) {
             outerDiv.remove();
         }
     }
-
     if (window.sniffTools?.initialized) {
         clearUI();
     }
@@ -272,4 +294,4 @@ interface SniffTools {
     window.sniffTools = {
         initialized: true
     };
-})(document.body as HTMLBodyElement);
+})(document.body as HTMLBodyElement, document.createElement);

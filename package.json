@@ -21,6 +21,7 @@
   "author": "Michael Crawford",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^18.15.11",
     "@types/web": "^0.0.99",
     "fs": "^0.0.1-security",
     "jsmin": "^1.0.1",

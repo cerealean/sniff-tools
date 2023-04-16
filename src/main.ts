@@ -3,59 +3,78 @@ interface Window {
         initialized: boolean
     }
 }
-((bodyElement: HTMLBodyElement, docCreateElement) => {
+((bodyElement: HTMLBodyElement) => {
     interface FilterOptions {
         ageMax?: number;
         ageMin?: number;
+        sizeMin?: number;
     }
     interface CurrentValues {
+        size?: number;
         profilesHidden?: number;
         profilesShown?: number;
         maxAge?: number;
         minAge?: number;
-    };
+    }
     type DeepPartial<T> = T extends object ? {
         [P in keyof T]?: DeepPartial<T[P]>;
     } : T;
-    type ElementCreationGeneralNonFunctionProperties<T extends keyof HTMLElementTagNameMap> = Pick<DeepPartial<HTMLElementTagNameMap[T]>, 'id' | 'title' | 'style' | 'innerHTML' | 'innerText'>;
     type ElementCreationGeneralFunctionProperties<T extends keyof HTMLElementTagNameMap> = Partial<Pick<HTMLElementTagNameMap[T], 'onblur' | 'onmouseover' | 'onmouseleave' | 'onclick'>>;
-    type ElementCreationGeneralProperties<T extends keyof HTMLElementTagNameMap> = ElementCreationGeneralNonFunctionProperties<T> & ElementCreationGeneralFunctionProperties<T>;
-    type ElementCreationInputProperties = Partial<Pick<HTMLInputElement, 'type' | 'min' | 'max' | 'required' | 'placeholder'>>;
-    type ElementCreationOptions<T extends keyof HTMLElementTagNameMap> = T extends HTMLInputElement
-        ? (ElementCreationGeneralProperties<T> | ElementCreationInputProperties)
-        : ElementCreationGeneralProperties<T>;
+    type ElementCreationBaseOptions<T extends keyof HTMLElementTagNameMap> = DeepPartial<Pick<HTMLElementTagNameMap[T], 'id' | 'title' | 'innerHTML' | 'innerText' | 'style'>>;
+    type ElementCreationInputOptions = Partial<Pick<HTMLInputElement, 'type' | 'max' | 'min' | 'required' | 'placeholder' | 'oninput'>>;
+    type GeneralNonFunctionProperties<T extends keyof HTMLElementTagNameMap> = HTMLElementTagNameMap[T] extends HTMLInputElement
+        ? ElementCreationInputOptions & ElementCreationBaseOptions<T>
+        : HTMLElementTagNameMap[T] extends HTMLLabelElement
+        ? DeepPartial<Pick<HTMLLabelElement, 'htmlFor'>> & ElementCreationBaseOptions<T>
+        : ElementCreationBaseOptions<T>;
+    type ElementCreationOptions<T extends keyof HTMLElementTagNameMap> = GeneralNonFunctionProperties<T> & ElementCreationGeneralFunctionProperties<T>;
     class Constants {
         static readonly namespace = 'sniff_extra_tooling_';
         static readonly outerDivId = this.namespace + 'outer_div';
         static readonly outerDivHeaderId = this.outerDivId + '_header';
         static readonly statsDivId = this.namespace + 'stats';
+        static readonly filterWrapperDivId = this.namespace + 'filter_wrapper';
         static readonly maxAgeInput = this.namespace + 'max_age_input';
         static readonly minAgeInput = this.namespace + 'min_age_input';
+        static readonly minSizeInput = this.namespace + 'min_size_input';
+        static readonly bodyTypes = ['fit', 'slim', 'muscular', 'average', 'stocky', 'chubby', 'large'];
     }
     class Profile {
         age?: number;
+        height?: string;
+        size?: number;
+        bodyType?: string;
         element?: HTMLDivElement;
     }
-    const currentValues: CurrentValues = {};
+    let currentValues: CurrentValues = {};
     function isNumber(val: any) {
         return !isNaN(val);
     }
     function styleElement(elmt: HTMLElement, styleOptions: DeepPartial<CSSStyleDeclaration>) {
-        const style = elmt.style;
+        const style = elmt.style as any;
         for (const [key, value] of Object.entries(styleOptions)) {
-            style.setProperty(key, value as string | null);
+            style[key] = value;
         }
     }
     function createElement<T extends keyof HTMLElementTagNameMap>(tag: T, options?: ElementCreationOptions<T>): HTMLElementTagNameMap[T] {
-        const newElement = docCreateElement(tag);
+        const newElement = document.createElement(tag);
         if (options) {
             if (options.id) newElement.id = options.id;
             if (options.title) newElement.title = options.title;
             if (options.innerHTML) newElement.innerHTML = options.innerHTML;
             if (options.innerText) newElement.innerText = options.innerText;
-            if(newElement instanceof HTMLInputElement) {
-                if (options.type) newElement.type = options.type;
-
+            if (newElement instanceof HTMLInputElement) {
+                const castOptions = options as ElementCreationOptions<'input'>;
+                if (castOptions.type) newElement.type = castOptions.type;
+                if (castOptions.max) newElement.max = castOptions.max;
+                if (castOptions.min) newElement.min = castOptions.min;
+                if (castOptions.required) newElement.required = castOptions.required;
+                if (castOptions.placeholder) newElement.placeholder = castOptions.placeholder;
+                if (castOptions.oninput) newElement.oninput = castOptions.oninput;
+            }
+            if (newElement instanceof HTMLLabelElement) {
+                const castOptions = options as ElementCreationOptions<'label'>;
+                if (castOptions.htmlFor) newElement.htmlFor = castOptions.htmlFor;
             }
             if (options.onblur) newElement.onblur = options.onblur;
             if (options.onmouseleave) newElement.onmouseleave = options.onmouseleave;
@@ -121,23 +140,33 @@ interface Window {
             headerElement!.onmousemove = null;
         }
     }
-    function tryGetAgeFromTitleString(titleString?: string) {
-        if (!titleString) {
-            return undefined;
-        }
-        const firstValue = titleString.split(',')[0].replace(',', "").trim();
-        return isNumber(firstValue) ? +firstValue : undefined;
+    function parseTitleString(titleString?: string) {
+        if (!titleString) return { age: undefined, height: undefined, dickSize: undefined, bodyType: undefined };
+
+        const strParts = titleString.split(',').map(s => s.trim());
+
+        return {
+            age: strParts.find(sp => isNumber(sp)),
+            height: strParts.find(sp => sp.includes("'") && sp.includes('"')),
+            size: strParts.find(sp => sp.includes('"') && !sp.includes("'"))?.replace(/[^0-9\.]+/g, ''),
+            bodyType: strParts.find(sp => Constants.bodyTypes.includes(sp.toLowerCase()))
+        };
     }
     function getProfiles() {
         const parentElements: HTMLDivElement[] = Array.from(bodyElement.querySelectorAll('div.mapboxgl-marker.mapboxgl-marker-anchor-center').values()) as HTMLDivElement[];
         const profiles = parentElements.filter(pe => pe.querySelectorAll('div.title-tag').length <= 1).map(parentElement => {
             const newProfile = new Profile();
             const titleData = (parentElement.querySelector('div.title-tag') as HTMLElement)?.innerText || undefined;
-            newProfile.age = tryGetAgeFromTitleString(titleData);
+            const { age, height, size, bodyType } = parseTitleString(titleData);
+            newProfile.age = age ? +age : undefined;
+            newProfile.height = height;
+            newProfile.size = size ? Number(size) : undefined;
+            newProfile.bodyType = bodyType;
             newProfile.element = parentElement;
 
             return newProfile;
         });
+        console.log(profiles);
 
         return profiles;
     }
@@ -154,6 +183,11 @@ interface Window {
             profilesToHide.push(...profilesUnderMinAge);
             profiles = profiles.filter(p => !profilesUnderMinAge.includes(p));
         }
+        if (filterOptions.sizeMin) {
+            const profilesToFilter = profiles.filter(p => p.size === undefined || p.size < filterOptions.sizeMin!);
+            profilesToHide.push(...profilesToFilter);
+            profiles = profiles.filter(p => !profilesToFilter.includes(p));
+        }
         currentValues.profilesShown = profiles.length;
         currentValues.profilesHidden = profilesToHide.length;
         showElements(...profiles.map(p => p.element!));
@@ -168,7 +202,8 @@ interface Window {
     function filterButtonClicked() {
         filterUnwantedProfiles({
             ageMax: currentValues.maxAge,
-            ageMin: currentValues.minAge
+            ageMin: currentValues.minAge,
+            sizeMin: currentValues.size
         });
         updateStats();
     }
@@ -183,7 +218,14 @@ interface Window {
         makeElementDraggable(outerDiv);
 
         function addStatsDiv(outerDivElmt: HTMLDivElement) {
-            const statsDiv = createElement('div', { id: Constants.statsDivId, title: 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.' });
+            const statsDiv = createElement('div', { 
+                id: Constants.statsDivId, 
+                title: 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.',
+                style: {
+                    width: '100%',
+                    textAlign: 'center'
+                } 
+            });
             outerDivElmt.appendChild(statsDiv);
         }
         function setupOuterDiv() {
@@ -191,12 +233,13 @@ interface Window {
                 id: Constants.outerDivId,
                 style: {
                     backgroundColor: 'white',
-                    border: '1px solid black',
+                    border: '3px solid black',
                     position: 'absolute',
                     zIndex: '99',
-                    minWidth: '18vw',
-                    minHeight: '16vh',
-                    resize: 'both'
+                    minWidth: '30vw',
+                    resize: 'both',
+                    overflow: 'hidden',
+                    padding: '3px'
                 }
             });
 
@@ -216,17 +259,123 @@ interface Window {
                     headerElement.style.cursor = 'initial';
                 }
             });
+            headerElement.appendChild(
+                createElement('small', {
+                    innerText: '[Minimize Filters]',
+                    onclick: (ev) => {
+                        const target = ev.target as HTMLElement;
+                        const filterOptionsWrapper = outerDivElmt.querySelector(`#${Constants.filterWrapperDivId}`) as HTMLDivElement;
+                        const isHidden = filterOptionsWrapper.style.display === 'none';
+                        if(isHidden) {
+                            showElements(filterOptionsWrapper);
+                            target.innerText = '[Minimize Filters]';
+                        } else {
+                            hideElements(filterOptionsWrapper);
+                            target.innerText = '[Show Filters]';
+                        }
+                    },
+                    style: {
+                        cursor: 'pointer'
+                    }
+                })
+            );
             outerDivElmt.appendChild(headerElement);
         }
         function addFilterOptions(outerDivElmt: HTMLDivElement) {
-            const filterWrapper = createElement('div');
-            styleElement(filterWrapper, { width: '100%', height: '100%', padding: '3px' });
+            const filterWrapper = createElement('div', {
+                style: { width: '100%', height: '100%', padding: '5px' },
+                id: Constants.filterWrapperDivId
+            });
             const { maxAgeLabel, maxAgeInput } = setupMaxAgeFilterElements();
             const { minAgeLabel, minAgeInput } = setupMinAgeFilterElements();
+            const { minSizeLabel, minSizeInput } = setupMinSizeFilterElements();
             const filterButton = setupFilterButton();
-            appendChildren(filterWrapper, maxAgeLabel, maxAgeInput, createBreakElement(), minAgeLabel, minAgeInput, createBreakElement(), filterButton, createBreakElement());
+            const resetButton = setupResetButton();
+            appendChildren(
+                filterWrapper,
+                maxAgeLabel,
+                maxAgeInput,
+                createBreakElement(),
+                minAgeLabel,
+                minAgeInput,
+                createBreakElement(),
+                minSizeLabel,
+                minSizeInput,
+                createBreakElement(),
+                createElement('hr'),
+                createBreakElement(),
+                filterButton,
+                createElement('span', { innerHTML: '&nbsp;&nbsp;&nbsp;' }),
+                resetButton,
+                createBreakElement()
+            );
             outerDivElmt.appendChild(filterWrapper);
 
+            function setupMaxAgeFilterElements() {
+                const maxAgeInput = createElement('input', {
+                    type: 'number',
+                    max: '120',
+                    min: '18',
+                    required: false,
+                    id: Constants.maxAgeInput,
+                    title: 'The maximum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.',
+                    placeholder: 'Max Age e.g. 55',
+                    oninput: (ev) => currentValues.maxAge = (ev.target as HTMLInputElement).valueAsNumber,
+                    style: {
+                        border: '1px solid black',
+                        margin: '1px 3px 2px 3px',
+                        padding: '2px'
+                    }
+                });
+                const maxAgeLabel = createElement('label', {
+                    htmlFor: maxAgeInput.id,
+                    innerHTML: '<h3>Max Age</h3>'
+                });
+                return { maxAgeLabel, maxAgeInput };
+            }
+            function setupMinAgeFilterElements() {
+                const minAgeInput = createElement('input', {
+                    type: 'number',
+                    max: '120',
+                    min: '18',
+                    required: false,
+                    id: Constants.minAgeInput,
+                    title: 'The minimum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.',
+                    placeholder: 'Min Age e.g. 20',
+                    oninput: (ev) => currentValues.minAge = (ev.target as HTMLInputElement).valueAsNumber,
+                    style: {
+                        border: '1px solid black',
+                        margin: '1px 3px 2px 3px'
+                    }
+                });
+                const minAgeLabel = createElement('label', {
+                    htmlFor: minAgeInput.id,
+                    innerHTML: '<h3>Min Age</h3>'
+                });
+
+                return { minAgeLabel, minAgeInput };
+            }
+            function setupMinSizeFilterElements() {
+                const minSizeInput = createElement('input', {
+                    type: 'number',
+                    max: '20',
+                    min: '0',
+                    required: false,
+                    id: Constants.minSizeInput,
+                    placeholder: 'Min Size e.g. 5',
+                    oninput: (ev) => currentValues.size = (ev.target as HTMLInputElement).valueAsNumber,
+                    style: {
+                        border: '1px solid black',
+                        margin: '1px 3px 2px 3px'
+                    }
+                });
+                const minSizeLabel = createElement('label', {
+                    htmlFor: minSizeInput.id,
+                    innerHTML: '<h3>Min Size</h3>'
+                });
+
+                return { minSizeLabel, minSizeInput };
+            }
             function setupFilterButton() {
                 return createElement('button', {
                     innerText: 'Filter Profiles',
@@ -235,53 +384,54 @@ interface Window {
                         backgroundColor: 'grey',
                         transitionDuration: '0.4s'
                     },
-                    onmouseover: () => {
-                        filterButton.style.backgroundColor = 'white';
-                        filterButton.style.border = '2px solid black';
-                    },
-                    onmouseleave: () => {
-                        filterButton.style.backgroundColor = 'grey';
-                        filterButton.style.border = 'none';
-                    },
+                    onmouseover: (ev) => styleElement(
+                        ev.target as HTMLButtonElement,
+                        {
+                            backgroundColor: 'white',
+                            border: '2px solid black'
+                        }
+                    ),
+                    onmouseleave: (ev) => styleElement(
+                        ev.target as HTMLButtonElement,
+                        {
+                            backgroundColor: 'grey',
+                            border: 'none'
+                        }
+                    ),
                     onclick: (ev) => {
                         ev.preventDefault();
                         filterButtonClicked();
                     }
                 });
             }
-            function setupMaxAgeFilterElements() {
-                const maxAgeInput = createElement('input');
-                maxAgeInput.type = 'number';
-                maxAgeInput.max = '120';
-                maxAgeInput.min = '18';
-                maxAgeInput.required = false;
-                maxAgeInput.id = Constants.maxAgeInput;
-                maxAgeInput.title = 'The maximum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.';
-                maxAgeInput.placeholder = 'Max Age e.g. 55';
-                maxAgeInput.style.border = '1px solid black';
-                maxAgeInput.style.margin = '1px 3px 2px 3px';
-                maxAgeInput.oninput = () => currentValues.maxAge = maxAgeInput.valueAsNumber;
-                const maxAgeLabel = createElement('label');
-                maxAgeLabel.htmlFor = maxAgeInput.id;
-                maxAgeLabel.innerHTML = '<h3>Max Age</h3>';
-                return { maxAgeLabel, maxAgeInput };
-            }
-            function setupMinAgeFilterElements() {
-                const minAgeInput = createElement('input');
-                minAgeInput.type = 'number';
-                minAgeInput.max = '120';
-                minAgeInput.min = '18';
-                minAgeInput.required = false;
-                minAgeInput.id = Constants.minAgeInput;
-                minAgeInput.title = 'The minimum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.';
-                minAgeInput.placeholder = 'Min Age e.g. 20';
-                minAgeInput.style.border = '1px solid black';
-                minAgeInput.style.margin = '1px 3px 2px 3px';
-                minAgeInput.oninput = () => currentValues.minAge = minAgeInput.valueAsNumber;
-                const minAgeLabel = createElement('label');
-                minAgeLabel.htmlFor = minAgeInput.id;
-                minAgeLabel.innerHTML = '<h3>Min Age</h3>';
-                return { minAgeLabel, minAgeInput };
+            function setupResetButton() {
+                return createElement('button', {
+                    innerText: 'Reset Filters',
+                    style: {
+                        borderRadius: '2px',
+                        backgroundColor: 'grey',
+                        transitionDuration: '0.4s'
+                    },
+                    onmouseover: (ev) => styleElement(
+                        ev.target as HTMLButtonElement,
+                        {
+                            backgroundColor: 'white',
+                            border: '2px solid black'
+                        }
+                    ),
+                    onmouseleave: (ev) => styleElement(
+                        ev.target as HTMLButtonElement,
+                        {
+                            backgroundColor: 'grey',
+                            border: 'none'
+                        }
+                    ),
+                    onclick: (ev) => {
+                        ev.preventDefault();
+                        currentValues = {};
+                        filterButtonClicked();
+                    }
+                });
             }
         }
         function createBreakElement(): HTMLBRElement {
@@ -301,4 +451,4 @@ interface Window {
     window.sniffTools = {
         initialized: true
     };
-})(document.body as HTMLBodyElement, document.createElement);
+})(document.body as HTMLBodyElement);

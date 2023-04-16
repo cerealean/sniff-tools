@@ -22,7 +22,7 @@ interface Window {
     type ElementCreationGeneralProperties<T extends keyof HTMLElementTagNameMap> = ElementCreationGeneralNonFunctionProperties<T> & ElementCreationGeneralFunctionProperties<T>;
     type ElementCreationInputProperties = Partial<Pick<HTMLInputElement, 'type' | 'min' | 'max' | 'required' | 'placeholder'>>;
     type ElementCreationOptions<T extends keyof HTMLElementTagNameMap> = T extends HTMLInputElement
-        ? (ElementCreationGeneralProperties<T> & ElementCreationInputProperties)
+        ? (ElementCreationGeneralProperties<T> | ElementCreationInputProperties)
         : ElementCreationGeneralProperties<T>;
     class Constants {
         static readonly namespace = 'sniff_extra_tooling_';
@@ -53,7 +53,10 @@ interface Window {
             if (options.title) newElement.title = options.title;
             if (options.innerHTML) newElement.innerHTML = options.innerHTML;
             if (options.innerText) newElement.innerText = options.innerText;
-            if (options.type) newElement.type = options.type;
+            if(newElement instanceof HTMLInputElement) {
+                if (options.type) newElement.type = options.type;
+
+            }
             if (options.onblur) newElement.onblur = options.onblur;
             if (options.onmouseleave) newElement.onmouseleave = options.onmouseleave;
             if (options.onmouseover) newElement.onmouseover = options.onmouseover;

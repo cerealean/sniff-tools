@@ -4,16 +4,27 @@ const UglifyJS = require("uglify-js");
 async function minifyAndBuild() {
   try {
     const data = await fs.readFile('./dist/main.js', { encoding: 'utf8' });
-    const minified = UglifyJS.minify(data, {
+    const result = UglifyJS.minify(data, {
       mangle: {
-        toplevel: true
+        toplevel: true,
+        properties: {
+          builtins: true
+        }
       },
       compress: {
         passes: 3,
         negate_iife: false,
         toplevel: true
       }
-    }).code;
+    });
+    if(result.warnings) {
+      console.warn(result.warnings);
+    }
+    if(result.error) {
+      console.error(result.error);
+      return;
+    }
+    const minified = result.code;
     await Promise.all([
       fs.writeFile('./dist/output.min.js', minified).then(() => console.debug('Created minified output file')),
       fs.writeFile('./dist/bookmarklet.txt', `javascript:${minified}// Generated ${new Date().toString()}`).then(() => console.debug('Created bookmarklet file'))
@@ -22,4 +33,6 @@ async function minifyAndBuild() {
     console.log(err);
   }
 }
-minifyAndBuild();
+(async () => {
+  await minifyAndBuild();
+})();

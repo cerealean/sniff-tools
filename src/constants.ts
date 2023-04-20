@@ -4,6 +4,7 @@ export class Constants {
     static readonly outerDivHeaderId = this.outerDivId + '_header';
     static readonly statsDivId = this.namespace + 'stats';
     static readonly filterWrapperDivId = this.namespace + 'filter_wrapper';
+    static readonly menuOverlayId = this.namespace + 'menu_overlay';
     static readonly maxAgeInput = this.namespace + 'max_age_input';
     static readonly minAgeInput = this.namespace + 'min_age_input';
     static readonly minSizeInput = this.namespace + 'min_size_input';

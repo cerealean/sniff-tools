@@ -9,9 +9,10 @@ export class Controller {
     private readonly domUtility: DomUtility;
     private readonly bodyElement: HTMLBodyElement;
     private currentValues: CurrentValues = {};
-    private outerDiv!: HTMLDivElement;
+    private outerDiv?: HTMLDivElement;
     private currentFilterOptions?: FilterOptions;
-    private observer?: MutationObserver;
+    private profilesObserver?: MutationObserver;
+    private menuObserver?: MutationObserver;
 
     constructor(document: Document) {
         this.domUtility = new DomUtility(document);
@@ -20,20 +21,14 @@ export class Controller {
 
     public initialize() {
         this.setupUI();
-        this.observer = new MutationObserver((mutations) => {
-            const childrenChanges = mutations.find(mutation => mutation.type === "childList");
-            if(childrenChanges && this.currentFilterOptions) {
-                this.filterButtonClicked();
-            }
-        });
-        const profilesContainer = this.bodyElement.querySelector(`.mapboxgl-canvas-container`);
-        if (profilesContainer) {
-            this.observer.observe(profilesContainer, { childList: true });
-        }
+        this.setupProfilesObserver();
+        this.setupMenuObserver();
     }
 
     public deInitialize() {
-        this.observer?.disconnect();
+        this.filterUnwantedProfiles({});
+        this.profilesObserver?.disconnect();
+        this.menuObserver?.disconnect();
         this.clearUI();
     }
 
@@ -52,6 +47,69 @@ export class Controller {
         const outerDiv = this.bodyElement.querySelector(`#${Constants.outerDivId}`);
         if (outerDiv) {
             outerDiv.remove();
+        }
+        const menuOverlay = this.bodyElement.querySelector(`#${Constants.menuOverlayId}`);
+        if (menuOverlay) {
+            menuOverlay.remove();
+        }
+    }
+
+    private setupMenuObserver() {
+        const menuObserver = new MutationObserver(mutations => {
+            const childrenChanges = mutations.find(mutation => mutation.type === "childList");
+            if (childrenChanges) {
+                console.log(childrenChanges);
+                const addedFilterLayer = (Array.from(childrenChanges.addedNodes.values())
+                    .find(x => (x as HTMLElement).querySelector('filter-layer-component')) as HTMLDivElement)
+                    ?.querySelector('filter-layer-component')?.querySelector('div.list-item-group');
+                if (addedFilterLayer && !this.bodyElement.querySelector(`#${Constants.menuOverlayId}`)) {
+                    console.log('appending');
+                    const overlay = this.domUtility.createElement('div', {
+                        style: {
+                            width: '100%',
+                            height: '100%',
+                            cursor: 'not-allowed',
+                            position: 'absolute',
+                            top: '0',
+                            left: '0',
+                            backgroundColor: 'rgba(0,0,0,.5)'
+                        },
+                        onclick: (ev) => ev.preventDefault(),
+                        title: 'Regular filters are disabled while using Sniff Tools to prevent errors',
+                        id: Constants.menuOverlayId
+                    });
+                    const lineTLBR = this.domUtility.createElement('div', {
+                        style: {
+                            borderBottom: '3px solid rgb(255, 0, 0)',
+                            width: '100%',
+                            transform: 'rotate(10deg)',
+                            transformOrigin: 'left',
+                            position: 'relative'
+                        }
+                    });
+                    overlay.appendChild(lineTLBR);
+                    addedFilterLayer.appendChild(overlay);
+                }
+            }
+        });
+        const routerWrapper = this.bodyElement.querySelector('router-outlet')?.parentElement;
+        if (routerWrapper) {
+            menuObserver.observe(routerWrapper, {
+                childList: true
+            });
+        }
+    }
+
+    private setupProfilesObserver() {
+        this.profilesObserver = new MutationObserver((mutations) => {
+            const childrenChanges = mutations.find(mutation => mutation.type === "childList");
+            if (childrenChanges && this.currentFilterOptions) {
+                this.filterButtonClicked();
+            }
+        });
+        const profilesContainer = this.bodyElement.querySelector(`.mapboxgl-canvas-container`);
+        if (profilesContainer) {
+            this.profilesObserver.observe(profilesContainer, { childList: true });
         }
     }
 
@@ -92,7 +150,7 @@ export class Controller {
                 innerText: '[Minimize Filters]',
                 onclick: (ev) => {
                     const target = ev.target as HTMLElement;
-                    const filterOptionsWrapper = this.outerDiv.querySelector(`#${Constants.filterWrapperDivId}`) as HTMLDivElement;
+                    const filterOptionsWrapper = this.outerDiv!.querySelector(`#${Constants.filterWrapperDivId}`) as HTMLDivElement;
                     const isHidden = filterOptionsWrapper.style.display === 'none';
                     if (isHidden) {
                         this.domUtility.showElements(filterOptionsWrapper);
@@ -107,7 +165,25 @@ export class Controller {
                 }
             })
         );
-        this.outerDiv.appendChild(headerElement);
+        headerElement.appendChild(
+            this.domUtility.createElement('button', {
+                innerText: 'X',
+                title: 'Close Filters (will restore all profiles)',
+                style: {
+                    position: 'absolute',
+                    background: 'transparent',
+                    color: 'black',
+                    fontWeight: 'bolder',
+                    top: '2px',
+                    right: '2px'
+                },
+                onclick: (ev) => {
+                    ev.preventDefault();
+                    this.deInitialize();
+                }
+            })
+        )
+        this.outerDiv!.appendChild(headerElement);
     }
 
     private addStatsDiv() {
@@ -119,12 +195,12 @@ export class Controller {
                 textAlign: 'center'
             }
         });
-        this.outerDiv.appendChild(statsDiv);
+        this.outerDiv!.appendChild(statsDiv);
     }
 
     private addFilterOptions() {
         const filterWrapper = this.domUtility.createElement('div', {
-            style: { width: '100%', height: '100%', padding: '5px' },
+            style: { width: '100%', height: '100%', padding: '5px', textAlign: 'center', alignItems: 'middle' },
             id: Constants.filterWrapperDivId
         });
         const { maxAgeLabel, maxAgeInput } = this.setupMaxAgeFilterElements();
@@ -150,7 +226,7 @@ export class Controller {
             resetButton,
             this.createBreakElement()
         );
-        this.outerDiv.appendChild(filterWrapper);
+        this.outerDiv!.appendChild(filterWrapper);
     }
 
     private setupMaxAgeFilterElements() {
@@ -165,8 +241,7 @@ export class Controller {
             oninput: (ev) => this.currentValues.maxAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
                 border: '1px solid black',
-                margin: '1px 3px 2px 3px',
-                padding: '2px',
+                margin: '0 auto',
                 width: '80%'
             }
         });
@@ -189,7 +264,7 @@ export class Controller {
             oninput: (ev) => this.currentValues.minAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
                 border: '1px solid black',
-                margin: '1px 3px 2px 3px',
+                margin: '0 auto',
                 width: '80%'
             }
         });
@@ -212,7 +287,7 @@ export class Controller {
             oninput: (ev) => this.currentValues.size = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
                 border: '1px solid black',
-                margin: '1px 3px 2px 3px',
+                margin: '0 auto',
                 width: '80%'
             }
         });
@@ -351,8 +426,10 @@ export class Controller {
         }
         this.currentValues.profilesShown = profiles.length;
         this.currentValues.profilesHidden = profilesToHide.length;
+        profiles.forEach(p => this.domUtility.styleElement(p.element!, { animationDelay: '0', animationDuration: '0' }));
         this.domUtility.showElements(...profiles.map(p => p.element!));
         this.domUtility.hideElements(...profilesToHide.map(p => p.element!));
+        profiles.forEach(p => this.domUtility.styleElement(p.element!, { animationDelay: 'initial', animationDuration: 'initial' }));
     }
 
     private createBreakElement(): HTMLBRElement {

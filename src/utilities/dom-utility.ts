@@ -57,6 +57,9 @@ export class DomUtility {
     public appendChildren(parent: HTMLElement, ...children: HTMLElement[]) {
         children.forEach(elmt => parent.appendChild(elmt));
     }
+    public cloneElement<T extends HTMLElement>(elmt: T): T {
+        return elmt.cloneNode() as T;
+    }
     public makeElementDraggable(elmnt: HTMLElement) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         const headerElement = document.getElementById(Constants.outerDivHeaderId);

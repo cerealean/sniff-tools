@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "build": "tsc",
+    "build": "rollup -c --configPlugin @rollup/plugin-typescript",
     "postbuild": "node ./build/build.js",
     "buildWatch": "npm-watch build"
   },
@@ -20,12 +20,18 @@
   "keywords": [],
   "author": "Michael Crawford",
   "license": "ISC",
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
+    "@rollup/plugin-typescript": "^11.1.0",
     "@types/node": "^18.15.11",
     "@types/web": "^0.0.99",
     "fs": "^0.0.1-security",
-    "jsmin": "^1.0.1",
     "npm-watch": "^0.11.0",
-    "typescript": "^5.0.4"
+    "rollup": "^3.20.6",
+    "tslib": "^2.5.0",
+    "typescript": "^5.0.4",
+    "uglify-js": "^3.17.4"
   }
 }

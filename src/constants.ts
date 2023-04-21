@@ -9,4 +9,9 @@ export class Constants {
     static readonly minAgeInput = this.namespace + 'min_age_input';
     static readonly minSizeInput = this.namespace + 'min_size_input';
     static readonly bodyTypes = ['fit', 'slim', 'muscular', 'average', 'stocky', 'chubby', 'large'];
+    static readonly styleConstants = {
+        background: 'var(--cc-text)',
+        font: 'var(--cc-bg)',
+        border: 'var(--cc-bg)'
+    };
 }

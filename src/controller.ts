@@ -117,11 +117,14 @@ export class Controller {
         const outerDiv = this.domUtility.createElement('div', {
             id: Constants.outerDivId,
             style: {
-                backgroundColor: 'white',
-                border: '3px solid black',
+                backgroundColor: Constants.styleConstants.background,
+                color: Constants.styleConstants.font,
+                border: `3px solid ${Constants.styleConstants.border}`,
                 position: 'absolute',
                 zIndex: '99',
-                minWidth: '30vw',
+                width: '30vw',
+                maxWidth: '600px',
+                minWidth: '290px',
                 resize: 'both',
                 overflow: 'hidden',
                 padding: '3px'
@@ -138,7 +141,7 @@ export class Controller {
             style: {
                 textAlign: 'center',
                 fontWeight: 'bolder',
-                borderBottom: '1px solid black',
+                borderBottom: `1px solid ${Constants.styleConstants.border}`,
                 cursor: 'move'
             },
             onblur: () => {
@@ -172,7 +175,7 @@ export class Controller {
                 style: {
                     position: 'absolute',
                     background: 'transparent',
-                    color: 'black',
+                    // color: 'black',
                     fontWeight: 'bolder',
                     top: '2px',
                     right: '2px'
@@ -203,18 +206,17 @@ export class Controller {
             style: { width: '100%', height: '100%', padding: '5px', textAlign: 'center', alignItems: 'middle' },
             id: Constants.filterWrapperDivId
         });
-        const { maxAgeLabel, maxAgeInput } = this.setupMaxAgeFilterElements();
-        const { minAgeLabel, minAgeInput } = this.setupMinAgeFilterElements();
+        const maxAgeInput = this.setupMaxAgeFilterElements();
+        const minAgeInput = this.setupMinAgeFilterElements();
+        const ageFilterWrapper = this.domUtility.createElement('fieldset', { style: { display: 'flex', flexDirection: 'row', gap: '2em', border: `1px solid ${Constants.styleConstants.border}`, verticalAlign: 'middle', alignItems: 'middle' } });
+        const legend = this.domUtility.createElement('legend', { innerText: 'Age Filters', style: { fontSize: '12px' } });
+        this.domUtility.appendChildren(ageFilterWrapper, legend, maxAgeInput, minAgeInput, this.createBreakElement());
         const { minSizeLabel, minSizeInput } = this.setupMinSizeFilterElements();
         const filterButton = this.setupFilterButton();
         const resetButton = this.setupResetButton();
         this.domUtility.appendChildren(
             filterWrapper,
-            maxAgeLabel,
-            maxAgeInput,
-            this.createBreakElement(),
-            minAgeLabel,
-            minAgeInput,
+            ageFilterWrapper,
             this.createBreakElement(),
             minSizeLabel,
             minSizeInput,
@@ -240,16 +242,11 @@ export class Controller {
             placeholder: 'Max Age e.g. 55',
             oninput: (ev) => this.currentValues.maxAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
-                border: '1px solid black',
-                margin: '0 auto',
-                width: '80%'
+                border: `1px solid ${Constants.styleConstants.border}`,
+                flex: '1'
             }
         });
-        const maxAgeLabel = this.domUtility.createElement('label', {
-            htmlFor: maxAgeInput.id,
-            innerHTML: '<h3>Max Age</h3>'
-        });
-        return { maxAgeLabel, maxAgeInput };
+        return maxAgeInput ;
     }
 
     private setupMinAgeFilterElements() {
@@ -263,17 +260,12 @@ export class Controller {
             placeholder: 'Min Age e.g. 20',
             oninput: (ev) => this.currentValues.minAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
-                border: '1px solid black',
-                margin: '0 auto',
-                width: '80%'
+                border: `1px solid ${Constants.styleConstants.border}`,
+                flex: '1'
             }
         });
-        const minAgeLabel = this.domUtility.createElement('label', {
-            htmlFor: minAgeInput.id,
-            innerHTML: '<h3>Min Age</h3>'
-        });
 
-        return { minAgeLabel, minAgeInput };
+        return minAgeInput ;
     }
 
     private setupMinSizeFilterElements() {
@@ -286,7 +278,7 @@ export class Controller {
             placeholder: 'Min Size e.g. 5',
             oninput: (ev) => this.currentValues.size = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
-                border: '1px solid black',
+                border: `1px solid ${Constants.styleConstants.border}`,
                 margin: '0 auto',
                 width: '80%'
             }

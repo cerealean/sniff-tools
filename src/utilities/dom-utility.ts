@@ -18,6 +18,7 @@ export class DomUtility {
             if (options.title) newElement.title = options.title;
             if (options.innerHTML) newElement.innerHTML = options.innerHTML;
             if (options.innerText) newElement.innerText = options.innerText;
+            if (options.className) newElement.className = options.className;
             if (newElement instanceof HTMLInputElement) {
                 const castOptions = options as ElementCreationOptions<'input'>;
                 if (castOptions.type) newElement.type = castOptions.type;

@@ -13,6 +13,7 @@ export class Controller {
     private currentFilterOptions?: FilterOptions;
     private profilesObserver?: MutationObserver;
     private menuObserver?: MutationObserver;
+    private chatControlsObserver?: MutationObserver;
 
     constructor(document: Document) {
         this.domUtility = new DomUtility(document);
@@ -23,12 +24,61 @@ export class Controller {
         this.setupUI();
         this.setupProfilesObserver();
         this.setupMenuObserver();
+        this.chatControlsObserver = new MutationObserver((mutations) => {
+            const childChanges = mutations.find(mutation => mutation.type === "childList");
+            console.log('changes', childChanges);
+            if (childChanges?.addedNodes?.length) {
+                const target = (this.bodyElement.querySelector('.list-controls') as HTMLTableCellElement | undefined);
+                if (target) {
+                    const button = target.querySelectorAll('button')[1];
+                    button.addEventListener('pointerup', () => {
+                        setTimeout(() => {
+                            console.log('appending');
+                            target.appendChild(this.domUtility.createElement('button', {
+                                className: 'ng-star-inserted',
+                                innerText: 'Select All',
+                                id: ElementIdConstants.selectAllConversationsButtonId,
+                                onclick: () => {
+                                    const chatHolderTableRows = Array.from(this.bodyElement.querySelectorAll('.chatholder>tr.chatholder-row-item>td.chat-avatar').values()) as HTMLTableRowElement[];
+                                    console.log(chatHolderTableRows);
+                                    if (chatHolderTableRows?.length) {
+                                        chatHolderTableRows.forEach(chat => chat.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+                                    }
+                                }
+                            }));
+                        });
+                    });
+                }
+                // if (target && target.classList.contains('in-edit-mode')) {
+                //     target.appendChild(this.domUtility.createElement('button', {
+                //         className: 'ng-star-inserted',
+                //         innerText: 'Select All',
+                //         id: ElementIdConstants.selectAllConversationsButtonId,
+                //         onclick: () => {
+                //             const chatHolderTableRows = Array.from(this.bodyElement.querySelectorAll('#chatholder>tr.chatholder-row-item').values()) as HTMLTableRowElement[];
+                //             console.log(chatHolderTableRows);
+                //             if (chatHolderTableRows?.length) {
+                //                 chatHolderTableRows.forEach(chat => chat.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+                //             }
+                //         }
+                //     }));
+                // } else {
+                //     const selectAllButton = this.bodyElement.querySelector(`#${ElementIdConstants.selectAllConversationsButtonId}`);
+                //     selectAllButton?.remove();
+                // }
+            }
+        });
+        const routerWrapper = this.bodyElement.querySelector('router-outlet')?.parentElement;
+        this.chatControlsObserver.observe(routerWrapper!, {
+            childList: true
+        });
     }
 
     public deInitialize() {
         this.filterUnwantedProfiles({});
         this.profilesObserver?.disconnect();
         this.menuObserver?.disconnect();
+        this.chatControlsObserver?.disconnect();
         this.clearUI();
     }
 
@@ -39,7 +89,7 @@ export class Controller {
 
         this.addOuterDivHeader();
         this.addStatsDiv();
-        this.addFilterOptions();
+        this.addFiltersAndUtilities();
 
         this.bodyElement.appendChild(this.outerDiv);
         this.domUtility.makeElementDraggable(this.outerDiv);
@@ -61,12 +111,10 @@ export class Controller {
         const menuObserver = new MutationObserver(mutations => {
             const childrenChanges = mutations.find(mutation => mutation.type === "childList");
             if (childrenChanges) {
-                console.log(childrenChanges);
                 const addedFilterLayer = (Array.from(childrenChanges.addedNodes.values())
                     .find(x => (x as HTMLElement).querySelector('filter-layer-component')) as HTMLDivElement)
                     ?.querySelector('filter-layer-component')?.querySelector('div.list-item-group');
                 if (addedFilterLayer && !this.bodyElement.querySelector(`#${ElementIdConstants.menuOverlayId}`)) {
-                    console.log('appending');
                     const overlay = this.domUtility.createElement('div', {
                         style: {
                             width: '100%',
@@ -80,17 +128,17 @@ export class Controller {
                         onclick: (ev) => ev.preventDefault(),
                         title: 'Regular filters are disabled while using Sniff Tools to prevent errors',
                         id: ElementIdConstants.menuOverlayId
-                    });
-                    const lineTLBR = this.domUtility.createElement('div', {
-                        style: {
-                            borderBottom: '3px solid rgb(255, 0, 0)',
-                            width: '100%',
-                            transform: 'rotate(10deg)',
-                            transformOrigin: 'left',
-                            position: 'relative'
-                        }
-                    });
-                    overlay.appendChild(lineTLBR);
+                    }, [
+                        this.domUtility.createElement('div', {
+                            style: {
+                                borderBottom: '3px solid rgb(255, 0, 0)',
+                                width: '100%',
+                                transform: 'rotate(10deg)',
+                                transformOrigin: 'left',
+                                position: 'relative'
+                            }
+                        })
+                    ]);
                     addedFilterLayer.appendChild(overlay);
                 }
             }
@@ -117,11 +165,11 @@ export class Controller {
     }
 
     private setupStyles() {
-        const ctn = this.domUtility.createTextNode;
+        // const ctn = this.domUtility.createTextNode;
         const styles = this.domUtility.createElement('style', undefined, [
-            ctn(`#${ElementIdConstants.outerDivId} input{border-bottom:1px solid ${StyleConstants.BorderColor};flex:1;margin:.5em;backdrop-filter:brightness(0.75);flex:1;}`),
-            ctn(`#${ElementIdConstants.outerDivId} fieldset{display:flex;flex-direction:row;gap:2em;border:1px solid ${StyleConstants.BorderColor};vertical-align:middle;align-items:middle;}`),
-            ctn(`#${ElementIdConstants.outerDivId} fieldset>legend{font-size:12px;}`)
+            this.domUtility.createTextNode(`#${ElementIdConstants.outerDivId} input{border-bottom:1px solid ${StyleConstants.BorderColor};flex:1;margin:.5em;backdrop-filter:brightness(0.75);flex:1;}`),
+            this.domUtility.createTextNode(`#${ElementIdConstants.outerDivId} fieldset{display:flex;flex-direction:row;gap:2em;border:1px solid ${StyleConstants.BorderColor};vertical-align:middle;align-items:middle;}`),
+            this.domUtility.createTextNode(`#${ElementIdConstants.outerDivId} fieldset>legend{font-size:12px;}`)
         ]);
 
         return styles;
@@ -156,9 +204,6 @@ export class Controller {
                 fontWeight: 'bolder',
                 borderBottom: `1px solid ${StyleConstants.BorderColor}`,
                 cursor: 'move'
-            },
-            onblur: () => {
-                headerElement.style.cursor = 'initial';
             }
         }, [
             this.domUtility.createElement('small', {
@@ -210,7 +255,7 @@ export class Controller {
         this.outerDiv!.appendChild(statsDiv);
     }
 
-    private addFilterOptions() {
+    private addFiltersAndUtilities() {
         const filterWrapper = this.domUtility.createElement('div', {
             style: { width: '100%', height: '100%', textAlign: 'center', alignItems: 'middle' },
             id: ElementIdConstants.filterWrapperDivId
@@ -230,15 +275,15 @@ export class Controller {
     }
 
     private createFieldsetWrapper(fieldsetLegendText: string, fieldsetChildren: HTMLElement[] = []): HTMLFieldSetElement {
-        return this.domUtility.createElement('fieldset', { 
-            style: { 
-                display: 'flex', 
-                flexDirection: 'row', 
-                gap: '2em', 
-                border: `1px solid ${StyleConstants.BorderColor}`, 
-                verticalAlign: 'middle', 
-                alignItems: 'middle' 
-            } 
+        return this.domUtility.createElement('fieldset', {
+            style: {
+                display: 'flex',
+                flexDirection: 'row',
+                gap: '2em',
+                border: `1px solid ${StyleConstants.BorderColor}`,
+                verticalAlign: 'middle',
+                alignItems: 'middle'
+            }
         }, [
             this.domUtility.createElement('legend', { innerText: fieldsetLegendText }),
             ...fieldsetChildren
@@ -259,7 +304,7 @@ export class Controller {
                 flex: '1'
             }
         });
-        return maxAgeInput ;
+        return maxAgeInput;
     }
 
     private setupMinAgeFilterElements() {
@@ -277,7 +322,7 @@ export class Controller {
             }
         });
 
-        return minAgeInput ;
+        return minAgeInput;
     }
 
     private setupMaxSizeFilterElements() {
@@ -376,7 +421,7 @@ export class Controller {
     }
 
     private updateStats() {
-        const statsDiv = this.bodyElement.querySelector(`#${ElementIdConstants.statsDivId}`) as HTMLDivElement|undefined;
+        const statsDiv = this.bodyElement.querySelector(`#${ElementIdConstants.statsDivId}`) as HTMLDivElement | undefined;
         if (statsDiv) {
             statsDiv.innerHTML = `<strong>Profiles Shown</strong>:&nbsp;${this.currentValues.profilesShown},&nbsp;<strong>Profiles Hidden</strong>:&nbsp;${this.currentValues.profilesHidden}`;
         }
@@ -426,7 +471,7 @@ export class Controller {
             profilesToHide.push(...profilesToFilter);
             profiles = profiles.filter(p => !profilesToFilter.includes(p));
         }
-        if(filterOptions.sizeMax) {
+        if (filterOptions.sizeMax) {
             const profilesToFilter = profiles.filter(p => p.size === undefined || p.size > filterOptions.sizeMax!);
             profilesToHide.push(...profilesToFilter);
             profiles = profiles.filter(p => !profilesToFilter.includes(p));

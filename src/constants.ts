@@ -11,7 +11,8 @@ export const enum ElementIdConstants {
     maxAgeInputId = Application.namespace + 'max_age_input',
     minAgeInputId = Application.namespace + 'min_age_input',
     maxSizeInputId = Application.namespace + 'max_size_input',
-    minSizeInputId = Application.namespace + 'min_size_input'
+    minSizeInputId = Application.namespace + 'min_size_input',
+    selectAllConversationsButtonId = Application.namespace + 'select_all_convos'
 };
 
 export const enum StyleConstants {

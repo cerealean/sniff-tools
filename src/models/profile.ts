@@ -1,7 +1,10 @@
 export class Profile {
-    age?: number;
-    height?: string;
-    size?: number;
-    bodyType?: string;
-    element?: HTMLDivElement;
+
+    constructor(
+        public age?: number,
+        public height?: string,
+        public size?: number,
+        public bodyType?: string,
+        public element?: HTMLDivElement
+    ) { }
 }

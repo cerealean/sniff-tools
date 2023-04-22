@@ -1,4 +1,4 @@
-import { Constants } from "./constants";
+import { BodyTypeConstants, ElementIdConstants, StyleConstants } from "./constants";
 import { CurrentValues } from "./interfaces/current-values";
 import { FilterOptions } from "./interfaces/filter-options";
 import { Profile } from "./models/profile";
@@ -33,7 +33,9 @@ export class Controller {
     }
 
     private setupUI() {
+        const styles = this.setupStyles();
         this.outerDiv = this.setupOuterDiv();
+        this.outerDiv.appendChild(styles);
 
         this.addOuterDivHeader();
         this.addStatsDiv();
@@ -41,14 +43,15 @@ export class Controller {
 
         this.bodyElement.appendChild(this.outerDiv);
         this.domUtility.makeElementDraggable(this.outerDiv);
+        this.filterButtonClicked();
     }
 
     private clearUI() {
-        const outerDiv = this.bodyElement.querySelector(`#${Constants.outerDivId}`);
+        const outerDiv = this.bodyElement.querySelector(`#${ElementIdConstants.outerDivId}`);
         if (outerDiv) {
             outerDiv.remove();
         }
-        const menuOverlay = this.bodyElement.querySelector(`#${Constants.menuOverlayId}`);
+        const menuOverlay = this.bodyElement.querySelector(`#${ElementIdConstants.menuOverlayId}`);
         if (menuOverlay) {
             menuOverlay.remove();
         }
@@ -62,7 +65,7 @@ export class Controller {
                 const addedFilterLayer = (Array.from(childrenChanges.addedNodes.values())
                     .find(x => (x as HTMLElement).querySelector('filter-layer-component')) as HTMLDivElement)
                     ?.querySelector('filter-layer-component')?.querySelector('div.list-item-group');
-                if (addedFilterLayer && !this.bodyElement.querySelector(`#${Constants.menuOverlayId}`)) {
+                if (addedFilterLayer && !this.bodyElement.querySelector(`#${ElementIdConstants.menuOverlayId}`)) {
                     console.log('appending');
                     const overlay = this.domUtility.createElement('div', {
                         style: {
@@ -76,7 +79,7 @@ export class Controller {
                         },
                         onclick: (ev) => ev.preventDefault(),
                         title: 'Regular filters are disabled while using Sniff Tools to prevent errors',
-                        id: Constants.menuOverlayId
+                        id: ElementIdConstants.menuOverlayId
                     });
                     const lineTLBR = this.domUtility.createElement('div', {
                         style: {
@@ -113,21 +116,31 @@ export class Controller {
         }
     }
 
+    private setupStyles() {
+        const ctn = this.domUtility.createTextNode;
+        const styles = this.domUtility.createElement('style', undefined, [
+            ctn(`#${ElementIdConstants.outerDivId} input{border-bottom:1px solid ${StyleConstants.BorderColor};flex:1;margin:.5em;backdrop-filter:brightness(0.75);flex:1;}`),
+            ctn(`#${ElementIdConstants.outerDivId} fieldset{display:flex;flex-direction:row;gap:2em;border:1px solid ${StyleConstants.BorderColor};vertical-align:middle;align-items:middle;}`),
+            ctn(`#${ElementIdConstants.outerDivId} fieldset>legend{font-size:12px;}`)
+        ]);
+
+        return styles;
+    }
+
     private setupOuterDiv() {
         const outerDiv = this.domUtility.createElement('div', {
-            id: Constants.outerDivId,
+            id: ElementIdConstants.outerDivId,
             style: {
-                backgroundColor: Constants.styleConstants.background,
-                color: Constants.styleConstants.font,
-                border: `3px solid ${Constants.styleConstants.border}`,
+                backgroundColor: StyleConstants.BackgroundColor,
+                color: StyleConstants.FontColor,
+                border: `3px solid ${StyleConstants.BorderColor}`,
                 position: 'absolute',
                 zIndex: '99',
                 width: '30vw',
                 maxWidth: '600px',
                 minWidth: '290px',
                 resize: 'both',
-                overflow: 'hidden',
-                padding: '3px'
+                overflow: 'hidden'
             }
         });
 
@@ -136,24 +149,23 @@ export class Controller {
 
     private addOuterDivHeader() {
         const headerElement = this.domUtility.createElement('div', {
-            id: Constants.outerDivHeaderId,
+            id: ElementIdConstants.outerDivHeaderId,
             innerHTML: '<h2>Sniff Tools</h2>',
             style: {
                 textAlign: 'center',
                 fontWeight: 'bolder',
-                borderBottom: `1px solid ${Constants.styleConstants.border}`,
+                borderBottom: `1px solid ${StyleConstants.BorderColor}`,
                 cursor: 'move'
             },
             onblur: () => {
                 headerElement.style.cursor = 'initial';
             }
-        });
-        headerElement.appendChild(
+        }, [
             this.domUtility.createElement('small', {
                 innerText: '[Minimize Filters]',
                 onclick: (ev) => {
                     const target = ev.target as HTMLElement;
-                    const filterOptionsWrapper = this.outerDiv!.querySelector(`#${Constants.filterWrapperDivId}`) as HTMLDivElement;
+                    const filterOptionsWrapper = this.outerDiv!.querySelector(`#${ElementIdConstants.filterWrapperDivId}`) as HTMLDivElement;
                     const isHidden = filterOptionsWrapper.style.display === 'none';
                     if (isHidden) {
                         this.domUtility.showElements(filterOptionsWrapper);
@@ -166,16 +178,13 @@ export class Controller {
                 style: {
                     cursor: 'pointer'
                 }
-            })
-        );
-        headerElement.appendChild(
+            }),
             this.domUtility.createElement('button', {
                 innerText: 'X',
                 title: 'Close Filters (will restore all profiles)',
                 style: {
                     position: 'absolute',
                     background: 'transparent',
-                    // color: 'black',
                     fontWeight: 'bolder',
                     top: '2px',
                     right: '2px'
@@ -185,13 +194,13 @@ export class Controller {
                     this.deInitialize();
                 }
             })
-        )
+        ]);
         this.outerDiv!.appendChild(headerElement);
     }
 
     private addStatsDiv() {
         const statsDiv = this.domUtility.createElement('div', {
-            id: Constants.statsDivId,
+            id: ElementIdConstants.statsDivId,
             title: 'Profiles shown or hidden from the latest filter. Only updates when clicking the "Filter Profiles" button.',
             style: {
                 width: '100%',
@@ -203,32 +212,37 @@ export class Controller {
 
     private addFilterOptions() {
         const filterWrapper = this.domUtility.createElement('div', {
-            style: { width: '100%', height: '100%', padding: '5px', textAlign: 'center', alignItems: 'middle' },
-            id: Constants.filterWrapperDivId
-        });
-        const maxAgeInput = this.setupMaxAgeFilterElements();
-        const minAgeInput = this.setupMinAgeFilterElements();
-        const ageFilterWrapper = this.domUtility.createElement('fieldset', { style: { display: 'flex', flexDirection: 'row', gap: '2em', border: `1px solid ${Constants.styleConstants.border}`, verticalAlign: 'middle', alignItems: 'middle' } });
-        const legend = this.domUtility.createElement('legend', { innerText: 'Age Filters', style: { fontSize: '12px' } });
-        this.domUtility.appendChildren(ageFilterWrapper, legend, maxAgeInput, minAgeInput, this.createBreakElement());
-        const { minSizeLabel, minSizeInput } = this.setupMinSizeFilterElements();
-        const filterButton = this.setupFilterButton();
-        const resetButton = this.setupResetButton();
-        this.domUtility.appendChildren(
-            filterWrapper,
-            ageFilterWrapper,
+            style: { width: '100%', height: '100%', textAlign: 'center', alignItems: 'middle' },
+            id: ElementIdConstants.filterWrapperDivId
+        }, [
+            this.createFieldsetWrapper('Age Filters', [this.setupMinAgeFilterElements(), this.setupMaxAgeFilterElements()]),
             this.createBreakElement(),
-            minSizeLabel,
-            minSizeInput,
+            this.createFieldsetWrapper('🍆 Filters', [this.setupMinSizeFilterElements(), this.setupMaxSizeFilterElements()]),
             this.createBreakElement(),
             this.domUtility.createElement('hr'),
             this.createBreakElement(),
-            filterButton,
+            this.setupFilterButton(),
             this.domUtility.createElement('span', { innerHTML: '&nbsp;&nbsp;&nbsp;' }),
-            resetButton,
+            this.setupResetButton(),
             this.createBreakElement()
-        );
+        ]);
         this.outerDiv!.appendChild(filterWrapper);
+    }
+
+    private createFieldsetWrapper(fieldsetLegendText: string, fieldsetChildren: HTMLElement[] = []): HTMLFieldSetElement {
+        return this.domUtility.createElement('fieldset', { 
+            style: { 
+                display: 'flex', 
+                flexDirection: 'row', 
+                gap: '2em', 
+                border: `1px solid ${StyleConstants.BorderColor}`, 
+                verticalAlign: 'middle', 
+                alignItems: 'middle' 
+            } 
+        }, [
+            this.domUtility.createElement('legend', { innerText: fieldsetLegendText }),
+            ...fieldsetChildren
+        ]);
     }
 
     private setupMaxAgeFilterElements() {
@@ -237,12 +251,11 @@ export class Controller {
             max: '120',
             min: '18',
             required: false,
-            id: Constants.maxAgeInput,
+            id: ElementIdConstants.maxAgeInputId,
             title: 'The maximum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.',
-            placeholder: 'Max Age e.g. 55',
+            placeholder: 'Max Age e.g. 99',
             oninput: (ev) => this.currentValues.maxAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
-                border: `1px solid ${Constants.styleConstants.border}`,
                 flex: '1'
             }
         });
@@ -255,12 +268,11 @@ export class Controller {
             max: '120',
             min: '18',
             required: false,
-            id: Constants.minAgeInput,
+            id: ElementIdConstants.minAgeInputId,
             title: 'The minimum age someone can be before being filtered out. Note: will also filter out anyone who does not have an age listed.',
-            placeholder: 'Min Age e.g. 20',
+            placeholder: 'Min Age e.g. 19',
             oninput: (ev) => this.currentValues.minAge = (ev.target as HTMLInputElement).valueAsNumber,
             style: {
-                border: `1px solid ${Constants.styleConstants.border}`,
                 flex: '1'
             }
         });
@@ -268,27 +280,30 @@ export class Controller {
         return minAgeInput ;
     }
 
+    private setupMaxSizeFilterElements() {
+        const minSizeInput = this.domUtility.createElement('input', {
+            type: 'number',
+            max: '20',
+            min: '0',
+            id: ElementIdConstants.minSizeInputId,
+            placeholder: 'Max Size e.g. 5',
+            oninput: (ev) => this.currentValues.maxSize = (ev.target as HTMLInputElement).valueAsNumber
+        });
+
+        return minSizeInput;
+    }
+
     private setupMinSizeFilterElements() {
         const minSizeInput = this.domUtility.createElement('input', {
             type: 'number',
             max: '20',
             min: '0',
-            required: false,
-            id: Constants.minSizeInput,
+            id: ElementIdConstants.minSizeInputId,
             placeholder: 'Min Size e.g. 5',
-            oninput: (ev) => this.currentValues.size = (ev.target as HTMLInputElement).valueAsNumber,
-            style: {
-                border: `1px solid ${Constants.styleConstants.border}`,
-                margin: '0 auto',
-                width: '80%'
-            }
-        });
-        const minSizeLabel = this.domUtility.createElement('label', {
-            htmlFor: minSizeInput.id,
-            innerHTML: '<h3>Min Size</h3>'
+            oninput: (ev) => this.currentValues.minSize = (ev.target as HTMLInputElement).valueAsNumber
         });
 
-        return { minSizeLabel, minSizeInput };
+        return minSizeInput;
     }
 
     private setupFilterButton() {
@@ -354,13 +369,14 @@ export class Controller {
         this.filterUnwantedProfiles({
             ageMax: this.currentValues.maxAge,
             ageMin: this.currentValues.minAge,
-            sizeMin: this.currentValues.size
+            sizeMin: this.currentValues.minSize,
+            sizeMax: this.currentValues.maxSize
         });
         this.updateStats();
     }
 
     private updateStats() {
-        const statsDiv = this.bodyElement.querySelector(`#${Constants.statsDivId}`) as HTMLDivElement | undefined;
+        const statsDiv = this.bodyElement.querySelector(`#${ElementIdConstants.statsDivId}`) as HTMLDivElement|undefined;
         if (statsDiv) {
             statsDiv.innerHTML = `<strong>Profiles Shown</strong>:&nbsp;${this.currentValues.profilesShown},&nbsp;<strong>Profiles Hidden</strong>:&nbsp;${this.currentValues.profilesHidden}`;
         }
@@ -369,16 +385,15 @@ export class Controller {
     private getProfiles() {
         const parentElements: HTMLDivElement[] = Array.from(this.bodyElement.querySelectorAll('div.mapboxgl-marker.mapboxgl-marker-anchor-center').values()) as HTMLDivElement[];
         const profiles = parentElements.filter(pe => pe.querySelectorAll('div.title-tag').length <= 1).map(parentElement => {
-            const newProfile = new Profile();
             const titleData = (parentElement.querySelector('div.title-tag') as HTMLElement)?.innerText || undefined;
             const { age, height, size, bodyType } = this.parseTitleString(titleData);
-            newProfile.age = age ? +age : undefined;
-            newProfile.height = height;
-            newProfile.size = size ? Number(size) : undefined;
-            newProfile.bodyType = bodyType;
-            newProfile.element = parentElement;
-
-            return newProfile;
+            return new Profile(
+                age ? +age : undefined,
+                height,
+                size ? Number(size) : undefined,
+                bodyType,
+                parentElement
+            );
         });
 
         return profiles;
@@ -393,7 +408,7 @@ export class Controller {
             age: strParts.find(sp => TypeUtility.isNumber(sp)),
             height: strParts.find(sp => sp.includes("'") && sp.includes('"')),
             size: strParts.find(sp => sp.includes('"') && !sp.includes("'"))?.replace(/[^0-9\.]+/g, ''),
-            bodyType: strParts.find(sp => Constants.bodyTypes.includes(sp.toLowerCase()))
+            bodyType: strParts.find(sp => (Object.values(BodyTypeConstants) as string[]).includes(sp.toLowerCase()))
         };
     }
 
@@ -402,14 +417,19 @@ export class Controller {
         let profiles = this.getProfiles();
         const profilesToHide: Profile[] = [];
         if (filterOptions.ageMax) {
-            const profilesAboveAgeMax = profiles.filter(p => p.age === undefined || p.age >= filterOptions.ageMax!);
-            profilesToHide.push(...profilesAboveAgeMax);
-            profiles = profiles.filter(p => !profilesAboveAgeMax.includes(p));
+            const profilesToFilter = profiles.filter(p => p.age === undefined || p.age > filterOptions.ageMax!);
+            profilesToHide.push(...profilesToFilter);
+            profiles = profiles.filter(p => !profilesToFilter.includes(p));
         }
         if (filterOptions.ageMin) {
-            const profilesUnderMinAge = profiles.filter(p => p.age === undefined || p.age < filterOptions.ageMin!);
-            profilesToHide.push(...profilesUnderMinAge);
-            profiles = profiles.filter(p => !profilesUnderMinAge.includes(p));
+            const profilesToFilter = profiles.filter(p => p.age === undefined || p.age < filterOptions.ageMin!);
+            profilesToHide.push(...profilesToFilter);
+            profiles = profiles.filter(p => !profilesToFilter.includes(p));
+        }
+        if(filterOptions.sizeMax) {
+            const profilesToFilter = profiles.filter(p => p.size === undefined || p.size > filterOptions.sizeMax!);
+            profilesToHide.push(...profilesToFilter);
+            profiles = profiles.filter(p => !profilesToFilter.includes(p));
         }
         if (filterOptions.sizeMin) {
             const profilesToFilter = profiles.filter(p => p.size === undefined || p.size < filterOptions.sizeMin!);

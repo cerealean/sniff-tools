@@ -1,4 +1,4 @@
-import { Constants } from "../constants";
+import { ElementIdConstants } from "../constants";
 import { DeepPartial } from "../types/deep-partial";
 import { ElementCreationOptions } from '../types/element-creation-options';
 
@@ -11,8 +11,7 @@ export class DomUtility {
             style[key] = value;
         }
     }
-
-    public createElement<T extends keyof HTMLElementTagNameMap>(tag: T, options?: ElementCreationOptions<T>): HTMLElementTagNameMap[T] {
+    public createElement<T extends keyof HTMLElementTagNameMap>(tag: T, options?: ElementCreationOptions<T>, childrenToAppend?: Node[]): HTMLElementTagNameMap[T] {
         const newElement = document.createElement(tag);
         if (options) {
             if (options.id) newElement.id = options.id;
@@ -38,7 +37,13 @@ export class DomUtility {
             if (options.onclick) newElement.onclick = options.onclick;
             if (options.style) this.styleElement(newElement, options.style);
         }
+        if(childrenToAppend?.length) {
+            childrenToAppend.forEach(child => newElement.appendChild(child));
+        }
         return newElement;
+    }
+    public createTextNode(data: string): Text {
+        return this.document.createTextNode(data);
     }
     public hideElements(...elements: HTMLElement[]) {
         elements.forEach(el => {
@@ -62,7 +67,7 @@ export class DomUtility {
     }
     public makeElementDraggable(elmnt: HTMLElement) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
-        const headerElement = document.getElementById(Constants.outerDivHeaderId);
+        const headerElement = document.getElementById(ElementIdConstants.outerDivHeaderId);
         if (!headerElement) {
             return;
         }

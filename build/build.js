@@ -1,10 +1,10 @@
-const fs = require('fs/promises');
-const UglifyJS = require("uglify-js");
+import { readFile, writeFile } from 'fs/promises';
+import { minify } from "uglify-js";
 
 async function minifyAndBuild() {
   try {
-    const data = await fs.readFile('./dist/main.js', { encoding: 'utf8' });
-    const result = UglifyJS.minify(data, {
+    const data = await readFile('./dist/main.js', { encoding: 'utf8' });
+    const result = minify(data, {
       mangle: {
         toplevel: true,
         properties: {
@@ -26,8 +26,8 @@ async function minifyAndBuild() {
     }
     const minified = result.code;
     await Promise.all([
-      fs.writeFile('./dist/output.min.js', minified).then(() => console.debug('Created minified output file')),
-      fs.writeFile('./dist/bookmarklet.txt', `javascript:${minified}// Generated ${new Date().toString()}`).then(() => console.debug('Created bookmarklet file'))
+      writeFile('./dist/output.min.js', minified).then(() => console.debug('Created minified output file')),
+      writeFile('./dist/bookmarklet.txt', `javascript:${minified}// Generated ${new Date().toString()}`).then(() => console.debug('Created bookmarklet file'))
     ]);
   } catch (err) {
     console.log(err);
